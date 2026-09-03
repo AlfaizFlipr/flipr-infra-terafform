@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+echo "==> Installing host dependencies"
+sudo apt-get update -y
+sudo apt-get install -y curl open-iscsi nfs-common jq
+sudo systemctl enable --now iscsid || true
+
+echo "==> Installing K3s single-node server"
+if ! command -v k3s >/dev/null 2>&1; then
+  curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL='${k3s_version}' sh -s - server \
+    --disable servicelb \
+    --disable traefik \
+    --write-kubeconfig-mode 644 \
+    --tls-san '${kube_vip}'
+fi
+sudo systemctl enable --now k3s
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+alias kubectl='sudo kubectl'
+
+echo "==> Installing Helm"
+if ! command -v helm >/dev/null 2>&1; then
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+fi
+helm version --short
+
+echo "==> Installing Kube-VIP for the Kubernetes API VIP"
+iface=$(ip route show default | awk 'NR==1 {print $5}')
+sudo mkdir -p /var/lib/rancher/k3s/server/manifests
+cat <<MANIFEST | sudo tee /var/lib/rancher/k3s/server/manifests/kube-vip.yaml >/dev/null
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-vip
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-vip-role
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "nodes", "pods"]
+  verbs: ["list", "get", "watch", "update", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["list", "get", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-vip-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-vip-role
+subjects:
+- kind: ServiceAccount
+  name: kube-vip
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-vip
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-vip
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-vip
+    spec:
+      serviceAccountName: kube-vip
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: kube-vip
+        image: ghcr.io/kube-vip/kube-vip:v0.8.2
+        imagePullPolicy: IfNotPresent
+        args: ["manager"]
+        env:
+        - name: vip_arp
+          value: "true"
+        - name: port
+          value: "6443"
+        - name: vip_interface
+          value: "$iface"
+        - name: address
+          value: "${kube_vip}"
+        - name: cp_enable
+          value: "true"
+        - name: svc_enable
+          value: "false"
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN", "NET_RAW"]
+MANIFEST
+
+echo "==> Installing MetalLB"
+helm repo add metallb https://metallb.github.io/metallb --force-update
+helm upgrade --install metallb metallb/metallb --namespace metallb-system --create-namespace --wait
+cat <<METALLB | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: primary-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - ${metallb_address_pool}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: primary-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - primary-pool
+METALLB
+
+echo "==> Installing Longhorn"
+helm repo add longhorn https://charts.longhorn.io --force-update
+helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace \
+  --set defaultSettings.defaultReplicaCount=${longhorn_replica_count} \
+  --set persistence.defaultClassReplicaCount=${longhorn_replica_count} \
+  --wait --timeout 10m
+
+echo "==> Installing private Docker Registry"
+helm repo add twuni https://helm.twun.io --force-update
+helm upgrade --install docker-registry twuni/docker-registry --namespace registry --create-namespace \
+  --set persistence.enabled=true \
+  --set persistence.size=${registry_storage_size} \
+  --set service.type=ClusterIP \
+  --wait --timeout 10m
+
+echo "==> Installing Jenkins"
+helm repo add jenkins https://charts.jenkins.io --force-update
+helm upgrade --install jenkins jenkins/jenkins --namespace jenkins --create-namespace \
+  --set persistence.enabled=true \
+  --set persistence.size=${jenkins_storage_size} \
+  --set controller.serviceType=ClusterIP \
+  --set controller.installPlugins[0]=kubernetes \
+  --set controller.installPlugins[1]=workflow-aggregator \
+  --set controller.installPlugins[2]=git \
+  --wait --timeout 15m
+
+echo "==> Waiting for and validating all components"
+kubectl rollout status daemonset/kube-vip -n kube-system --timeout=5m
+kubectl rollout status deployment/metallb-controller -n metallb-system --timeout=5m
+kubectl rollout status daemonset/metallb-speaker -n metallb-system --timeout=5m
+kubectl rollout status daemonset/longhorn-manager -n longhorn-system --timeout=10m
+kubectl wait --for=condition=Ready pod -n registry --all --timeout=10m
+kubectl wait --for=condition=Ready pod -n jenkins --all --timeout=15m
+kubectl wait --for=condition=ready node --all --timeout=5m
+
+echo ""
+echo "===== PLATFORM VALIDATION ====="
+kubectl get nodes -o wide
+kubectl get pods -A
+echo ""
+echo "Services:"
+kubectl -n registry get svc docker-registry
+kubectl -n jenkins get svc jenkins
+echo ""
+echo "Kube-VIP VIP: ${kube_vip}:6443"
+echo "MetalLB pool: ${metallb_address_pool}"
+echo "Bootstrap completed successfully."
