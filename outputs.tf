@@ -3,11 +3,6 @@ output "kubernetes_api" {
   value       = "https://${var.kube_vip}:6443"
 }
 
-output "node_ssh_command" {
-  description = "SSH command for inspecting the node."
-  value       = "ssh -i ${var.ssh_private_key_path} ${var.ssh_user}@${var.node_host}"
-}
-
 output "service_commands" {
   description = "Commands for service discovery."
   value = {

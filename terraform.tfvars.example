@@ -1,5 +1,2 @@
-node_host            = "192.168.1.50"
-ssh_user             = "ubuntu"
-ssh_private_key_path = "C:/Users/you/.ssh/id_ed25519"
 kube_vip            = "192.168.1.60"
 metallb_address_pool = "192.168.1.240-192.168.1.250"

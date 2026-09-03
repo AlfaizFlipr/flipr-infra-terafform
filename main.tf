@@ -20,20 +20,10 @@ resource "null_resource" "platform" {
 
   triggers = {
     bootstrap_sha = sha256(local.rendered_bootstrap)
-    node_host     = var.node_host
   }
 
   provisioner "local-exec" {
-    interpreter = ["PowerShell", "-NoProfile", "-NonInteractive", "-Command"]
-    command     = <<-EOT
-      $ErrorActionPreference = 'Stop'
-      $key = '${var.ssh_private_key_path}'
-      $hostName = '${var.node_host}'
-      $user = '${var.ssh_user}'
-      $remotePath = '${var.remote_script_path}'
-      $payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content -Raw '${local_file.bootstrap.filename}')))
-      ssh -o StrictHostKeyChecking=accept-new -i $key "$user@$hostName" "umask 077; printf '%s' '$payload' | base64 -d > $remotePath; chmod 700 $remotePath; sudo $remotePath"
-      if ($LASTEXITCODE -ne 0) { throw "Remote platform bootstrap failed with exit code $LASTEXITCODE" }
-    EOT
+    interpreter = ["/usr/bin/env", "bash", "-c"]
+    command     = "sudo ${local_file.bootstrap.filename}"
   }
 }

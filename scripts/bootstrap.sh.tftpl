@@ -3,6 +3,22 @@ set -Eeuo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+retry() {
+  local attempt=1
+  local max_attempts=3
+
+  until "$@"; do
+    if (( attempt >= max_attempts )); then
+      echo "Command failed after $max_attempts attempts: $*" >&2
+      return 1
+    fi
+
+    echo "Command failed (attempt $attempt/$max_attempts); retrying in 15 seconds..." >&2
+    attempt=$((attempt + 1))
+    sleep 15
+  done
+}
+
 echo "==> Installing host dependencies"
 sudo apt-get update -y
 sudo apt-get install -y curl open-iscsi nfs-common jq
@@ -103,8 +119,8 @@ spec:
 MANIFEST
 
 echo "==> Installing MetalLB"
-helm repo add metallb https://metallb.github.io/metallb --force-update
-helm upgrade --install metallb metallb/metallb --namespace metallb-system --create-namespace --wait
+retry helm repo add metallb https://metallb.github.io/metallb --force-update
+retry helm upgrade --install metallb metallb/metallb --namespace metallb-system --create-namespace --wait
 cat <<METALLB | kubectl apply -f -
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -126,23 +142,23 @@ spec:
 METALLB
 
 echo "==> Installing Longhorn"
-helm repo add longhorn https://charts.longhorn.io --force-update
-helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace \
+retry helm repo add longhorn https://charts.longhorn.io --force-update
+retry helm upgrade --install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace \
   --set defaultSettings.defaultReplicaCount=${longhorn_replica_count} \
   --set persistence.defaultClassReplicaCount=${longhorn_replica_count} \
   --wait --timeout 10m
 
 echo "==> Installing private Docker Registry"
-helm repo add twuni https://helm.twun.io --force-update
-helm upgrade --install docker-registry twuni/docker-registry --namespace registry --create-namespace \
+retry helm repo add twuni https://twuni.github.io/docker-registry.helm --force-update
+retry helm upgrade --install docker-registry twuni/docker-registry --namespace registry --create-namespace \
   --set persistence.enabled=true \
   --set persistence.size=${registry_storage_size} \
   --set service.type=ClusterIP \
   --wait --timeout 10m
 
 echo "==> Installing Jenkins"
-helm repo add jenkins https://charts.jenkins.io --force-update
-helm upgrade --install jenkins jenkins/jenkins --namespace jenkins --create-namespace \
+retry helm repo add jenkins https://charts.jenkins.io --force-update
+retry helm upgrade --install jenkins jenkins/jenkins --namespace jenkins --create-namespace \
   --set persistence.enabled=true \
   --set persistence.size=${jenkins_storage_size} \
   --set controller.serviceType=ClusterIP \

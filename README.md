@@ -1,6 +1,6 @@
 # Single-node K3s platform with Terraform
 
-This project provisions a single Linux node over SSH with Terraform from a Windows workstation. One `terraform apply` installs and validates:
+This project provisions the local Ubuntu host with Terraform. One `terraform apply` installs and validates:
 
 - K3s, configured as a single server
 - Kube-VIP for the Kubernetes API VIP
@@ -12,26 +12,18 @@ This project provisions a single Linux node over SSH with Terraform from a Windo
 
 Kube-VIP and MetalLB require unused addresses on the same L2 network as the node. This is API endpoint failover plumbing, not true high availability: one node remains a single point of failure.
 
-## Windows host requirements
+## Host requirements
 
-K3s and Longhorn are Linux components and cannot run natively in Windows. To run the complete platform on this same physical Windows machine, create one Ubuntu 22.04/24.04 VM using Hyper-V or VirtualBox. Attach the VM to an External/Bridged network adapter so its node IP, Kube-VIP, and MetalLB pool are on the same LAN. Do not use NAT networking for this setup because ARP-based VIP and MetalLB advertisement will not work correctly.
-
-The Ubuntu VM needs systemd, at least 4 vCPUs, 8 GB RAM, 60 GB free disk, and an SSH user with passwordless sudo. Enable OpenSSH Server in the VM and verify from Windows:
-
-```powershell
-ssh -i C:/Users/you/.ssh/id_ed25519 ubuntu@192.168.1.50
-```
-
-WSL2 is suitable for experimenting with K3s, but its virtual networking does not provide the LAN L2 behavior required by this Kube-VIP and MetalLB configuration. Use a bridged Linux VM for the complete requested stack.
+The Ubuntu host needs systemd, at least 4 CPUs, 8 GB RAM, 60 GB free disk, internet access, and a user that can run `sudo`. Its network must support L2/ARP advertisement. Kube-VIP and the MetalLB pool must be unused addresses on the same LAN as the host and must be excluded from DHCP.
 
 ## Usage
 
-1. Install Terraform 1.5+ on Windows and ensure `terraform`, `ssh`, and `scp` are on `PATH`.
+1. Install Terraform 1.5+ on Ubuntu.
 2. Copy `terraform.tfvars.example` to `terraform.tfvars` and replace every example value.
 3. Confirm the VIP and MetalLB range are not assigned by DHCP or another host.
 4. Run:
 
-```powershell
+```bash
 terraform init
 terraform apply -auto-approve
 ```

@@ -1,19 +1,3 @@
-variable "node_host" {
-  description = "DNS name or IP address of the single Linux node."
-  type        = string
-}
-
-variable "ssh_user" {
-  description = "SSH user with passwordless sudo on the node."
-  type        = string
-  default     = "ubuntu"
-}
-
-variable "ssh_private_key_path" {
-  description = "Path to the private SSH key used to reach the node."
-  type        = string
-}
-
 variable "kube_vip" {
   description = "Unused L2 address on the node's LAN for the Kubernetes API."
   type        = string
@@ -51,10 +35,4 @@ variable "jenkins_storage_size" {
   description = "Persistent volume size for Jenkins."
   type        = string
   default     = "20Gi"
-}
-
-variable "remote_script_path" {
-  description = "Temporary path used for the generated remote bootstrap script."
-  type        = string
-  default     = "/tmp/k3s-platform-bootstrap.sh"
 }
