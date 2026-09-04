@@ -165,10 +165,6 @@ retry helm upgrade --install jenkins jenkins/jenkins --namespace jenkins --creat
   --set controller.installPlugins[0]=kubernetes \
   --set controller.installPlugins[1]=workflow-aggregator \
   --set controller.installPlugins[2]=git \
-  --set controller.installPlugins[3]=github-branch-source \
-  --set controller.installPlugins[4]=credentials-binding \
-  --set controller.installPlugins[5]=ansicolor \
-  --set controller.installPlugins[6]=pipeline-model-definition \
   --wait --timeout 15m
 
 echo "==> Waiting for and validating all components"
