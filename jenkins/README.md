@@ -5,6 +5,26 @@ This directory contains the initial reusable design for two pipelines per projec
 - `Jenkinsfile.ci`: validates every pull request and never deploys.
 - `Jenkinsfile.deploy`: builds, pushes, and deploys approved commits from `dev`/`develop` or `main`.
 
+## Automated job setup
+
+Keep the Jenkins port-forward running, then execute:
+
+```bash
+chmod +x jenkins/setup-jobs.sh
+./jenkins/setup-jobs.sh
+```
+
+The script reads the GitHub owner/repository from `origin`, reads the initial Jenkins admin password from the Kubernetes Secret, and creates or updates `infra-pr-validation` and `infra-deploy`. Override defaults with environment variables when needed:
+
+```bash
+GITHUB_OWNER=fliprlab \
+GITHUB_REPOSITORY=devops-task \
+GITHUB_CREDENTIAL_ID=github-app \
+./jenkins/setup-jobs.sh
+```
+
+If an item with either name already exists as a regular Pipeline, the script preserves it by renaming it with a timestamped `-backup-...` suffix before creating the Multibranch Pipeline.
+
 Copy both files into each application repository, or configure each Jenkins job to load them from this repository. Keeping them in each application repository is recommended because pipeline changes then follow the same pull-request review process as application changes.
 
 ## Flow
