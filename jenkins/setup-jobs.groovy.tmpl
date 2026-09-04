@@ -27,7 +27,8 @@ def configureJob = { String name, String description, String scriptPath, List tr
     def job = existing ?: jenkins.createProject(WorkflowMultiBranchProject, name)
     job.setDescription(description)
 
-    def source = new GitHubSCMSource("${name}-${owner}-${repository}", owner, repository)
+    def source = new GitHubSCMSource(owner, repository)
+    source.setId("${name}-${owner}-${repository}".toString())
     source.setCredentialsId(credentialId)
     source.setTraits(traits)
     job.getSourcesList().replaceBy([new BranchSource(source)])

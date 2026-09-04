@@ -43,7 +43,13 @@ if [[ -z "${JENKINS_PASSWORD:-}" ]]; then
   )"
 fi
 
+cookie_jar="$(mktemp /tmp/jenkins-cookie.XXXXXX)"
+groovy_file=""
+response_file=""
+trap 'rm -f "$cookie_jar" ${groovy_file:+"$groovy_file"} ${response_file:+"$response_file"}' EXIT
+
 if ! curl --silent --show-error --fail \
+  --cookie-jar "$cookie_jar" \
   --user "$JENKINS_USER:$JENKINS_PASSWORD" \
   "$JENKINS_URL/api/json" >/dev/null; then
   echo "Cannot authenticate to Jenkins at $JENKINS_URL." >&2
@@ -54,6 +60,8 @@ fi
 
 crumb_json="$(
   curl --silent --show-error --fail \
+    --cookie "$cookie_jar" \
+    --cookie-jar "$cookie_jar" \
     --user "$JENKINS_USER:$JENKINS_PASSWORD" \
     "$JENKINS_URL/crumbIssuer/api/json"
 )"
@@ -65,7 +73,7 @@ if [[ -z "$crumb_field" || -z "$crumb_value" ]]; then
   exit 1
 fi
 groovy_file="$(mktemp /tmp/jenkins-jobs.XXXXXX.groovy)"
-trap 'rm -f "$groovy_file"' EXIT
+response_file="$(mktemp /tmp/jenkins-response.XXXXXX.txt)"
 
 sed \
   -e "s|@@OWNER@@|$GITHUB_OWNER|g" \
@@ -77,10 +85,18 @@ sed \
 
 echo "Configuring Jenkins jobs for $GITHUB_OWNER/$GITHUB_REPOSITORY ..."
 curl --silent --show-error --fail \
+  --cookie "$cookie_jar" \
   --user "$JENKINS_USER:$JENKINS_PASSWORD" \
   --header "$crumb_field: $crumb_value" \
   --data-urlencode "script@$groovy_file" \
+  --output "$response_file" \
   "$JENKINS_URL/scriptText"
+
+cat "$response_file"
+if ! grep --fixed-strings --quiet 'Jenkins multibranch pipeline setup completed.' "$response_file"; then
+  echo "Jenkins rejected the job configuration. See the error above." >&2
+  exit 1
+fi
 
 echo
 echo "Created or updated:"

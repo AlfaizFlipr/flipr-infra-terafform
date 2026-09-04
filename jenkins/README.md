@@ -116,3 +116,4 @@ Set `APP_NAME` and `K8S_NAMESPACE` in the deployment job. The basic deploy stage
 ## Important limitation
 
 These files define the pipeline behavior, but GitHub webhooks, branch-protection rules, Jenkins credentials, the `infra-admins` group, and the `infra-tools` agent require administrator configuration. Production deployment remains blocked until those controls are configured.
+
