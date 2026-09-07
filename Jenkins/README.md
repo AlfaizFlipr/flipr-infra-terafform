@@ -13,32 +13,29 @@ the same GitHub organization:
 ## One-time Jenkins configuration
 
 1. Install/update these plugins: **GitHub Branch Source**, **Pipeline**,
-   **Credentials Binding**, **SonarQube Scanner**, **Warnings Next Generation**
-   (optional), **JUnit**, **AnsiColor**, and the agent plugin you use
+   **Credentials Binding**, **Warnings Next Generation** (optional), **JUnit**,
+   **AnsiColor**, and the agent plugin you use
    (Kubernetes or Docker).
 2. Configure **Manage Jenkins → Configure System → Global Pipeline Libraries**:
    add `ms-jenkins-global-lib`, using its Git repository and trusted default
    version. The annotation in both Jenkinsfiles intentionally uses that library.
-3. Configure **Manage Jenkins → Configure System → SonarQube servers** with the
-   name `sonarqube`; configure its authentication token as instructed by the
-   SonarQube plugin.
-4. Provide disposable Jenkins agents labelled `terraform-ci` and
+3. Provide disposable Jenkins agents labelled `terraform-ci` and
    `kubernetes-ci`. The first needs `git`, Terraform, `tflint`, `trivy`,
-   `gitleaks`, and `sonar-scanner`. The second needs `git` and a Docker daemon
+   and `gitleaks`. The second needs `git` and a Docker daemon
    that can reach the internal registry. Do not put production cloud credentials
    on either PR agent.
-5. In Jenkins, create an **Organization Folder** called `PR Validation`.
+4. In Jenkins, create an **Organization Folder** called `PR Validation`.
    Under **Projects → Repository Sources**, add **GitHub Organization**. Select
    a GitHub App (recommended) or token credential and enter `flipr-Infra-test`
    as the owner — not the full URL. Set **Build Configuration → Script Path** to
    `Jenkins/pr-validation/Jenkinsfile`. In **Behaviours**, enable pull-request
    discovery for both origin and fork PRs as appropriate; for untrusted forks,
    build the merge revision and restrict secrets.
-6. Create a second Organization Folder called `Test Deploy`, with the same
+5. Create a second Organization Folder called `Test Deploy`, with the same
    GitHub Organization source and credentials. Set its Script Path to
    `Jenkins/deploy-test/Jenkinsfile`. Give this folder an explicit permission
    allowing `PR Validation` to build its child jobs.
-7. Run **Scan Organization Now** on both folders once. Configure the GitHub App
+6. Run **Scan Organization Now** on both folders once. Configure the GitHub App
    webhook to Jenkins' externally reachable webhook endpoint (not
    `127.0.0.1`) so PR open/synchronize events rescan promptly. The GitHub App
    needs repository metadata, contents read, pull requests read, and checks

@@ -55,22 +55,6 @@ pipeline {
       steps { sh 'tflint --init && tflint --recursive --format compact' }
     }
 
-    stage('SonarQube') {
-      steps {
-        withSonarQubeEnv('sonarqube') {
-          sh '''#!/usr/bin/env bash
-            set -Eeuo pipefail
-            command -v sonar-scanner >/dev/null
-            sonar-scanner \
-              -Dsonar.projectKey="${JOB_NAME//\//:}" \
-              -Dsonar.projectName="$JOB_NAME" \
-              -Dsonar.sources=. \
-              -Dsonar.exclusions='.terraform/**,**/.git/**'
-          '''
-        }
-      }
-    }
-
     stage('Security') {
       parallel {
         stage('IaC scan') {
