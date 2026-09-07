@@ -5,3 +5,7 @@ crash.log
 .generated/
 .generated-bootstrap.sh
 jenkins/config.env
+terraform-plan.txt
+tfplan
+test-image.txt
+test-results/
