@@ -170,6 +170,7 @@ retry helm upgrade --install jenkins jenkins/jenkins --namespace jenkins --creat
   --set controller.installPlugins[5]=ansicolor \
   --set controller.installPlugins[6]=pipeline-model-definition \
   --set controller.installPlugins[7]=pipeline-graph-view \
+  --set controller.installPlugins[8]=junit \
   --wait --timeout 15m
 
 echo "==> Waiting for and validating all components"

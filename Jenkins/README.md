@@ -12,6 +12,10 @@ the same GitHub organization:
 
 ## One-time Jenkins configuration
 
+The repeatable folder setup is available as `Jenkins/setup-org-folders.sh`.
+It creates/updates both folders using the Jenkins API after the required
+credentials have been created. It never stores credentials in Git.
+
 1. Install/update these plugins: **GitHub Branch Source**, **Pipeline**,
    **Credentials Binding**, **Warnings Next Generation** (optional), **JUnit**,
    **AnsiColor**, and the agent plugin you use
