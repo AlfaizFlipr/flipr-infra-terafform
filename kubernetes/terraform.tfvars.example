@@ -1,0 +1,5 @@
+kube_vip            = "192.168.1.60"
+metallb_address_pool = "192.168.1.240-192.168.1.250"
+longhorn_replica_count = 1
+registry_storage_size  = "20Gi"
+jenkins_storage_size   = "20Gi"

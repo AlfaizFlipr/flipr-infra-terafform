@@ -1,9 +1,9 @@
-.terraform/
+**/.terraform/
 *.tfstate
 *.tfstate.*
 crash.log
 .generated/
-.generated-bootstrap.sh
+**/.generated-bootstrap*.sh
 jenkins/config.env
 terraform-plan.txt
 tfplan

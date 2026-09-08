@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+echo "==> Installing server dependencies"
+apt-get update -y
+apt-get install -y curl open-iscsi nfs-common jq
+systemctl enable --now iscsid || true
+
+echo "==> Installing K3s single-node server"
+if ! command -v k3s >/dev/null 2>&1; then
+  curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL='${k3s_version}' sh -s - server \
+    --disable servicelb --disable traefik --write-kubeconfig-mode 644
+fi
+systemctl enable --now k3s
+echo "Server bootstrap completed successfully."

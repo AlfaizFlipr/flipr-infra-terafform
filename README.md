@@ -1,47 +1,39 @@
-# Single-node K3s platform with Terraform
+# Split server and Kubernetes Terraform configuration
 
-This project provisions the local Ubuntu host with Terraform. One `terraform apply` installs and validates:
+This repository has two independent Terraform roots:
 
-- K3s, configured as a single server
-- Kube-VIP for the Kubernetes API VIP
-- Helm 3
-- MetalLB with an L2 address pool for `LoadBalancer` services
-- Longhorn with one replica, which is the only viable setting on one node
-- An internal Docker Registry Helm release
-- Jenkins Helm release with persistent storage
+| Folder | Owns | Apply frequency |
+| --- | --- | --- |
+| `server/` | Ubuntu prerequisites and the single-node K3s server | When creating or rebuilding a server |
+| `kubernetes/` | Kube-VIP, MetalLB, Longhorn, Docker Registry, Jenkins, and future cluster workloads | Whenever Kubernetes configuration changes |
 
-Kube-VIP and MetalLB require unused addresses on the same L2 network as the node. This is API endpoint failover plumbing, not true high availability: one node remains a single point of failure.
+Each folder has separate Terraform state, variables, generated scripts, and provider initialization. Run Terraform only from the relevant directory.
 
-## Host requirements
+## Deploy
 
-The Ubuntu host needs systemd, at least 4 CPUs, 8 GB RAM, 60 GB free disk, internet access, and a user that can run `sudo`. Its network must support L2/ARP advertisement. Kube-VIP and the MetalLB pool must be unused addresses on the same LAN as the host and must be excluded from DHCP.
-
-## Usage
-
-1. Install Terraform 1.5+ on Ubuntu.
-2. Copy `terraform.tfvars.example` to `terraform.tfvars` and replace every example value.
-3. Confirm the VIP and MetalLB range are not assigned by DHCP or another host.
-4. Run:
+First prepare the server:
 
 ```bash
+cd server
+cp terraform.tfvars.example terraform.tfvars
 terraform init
-terraform apply -auto-approve
+terraform apply
 ```
 
-The `terraform apply -auto-approve` command is the single provisioning command; `terraform init` is only the one-time provider download. The apply streams remote validation output. Terraform state contains the node connection metadata, so keep it private.
-
-## Access
-
-The Registry and Jenkins services are intentionally `ClusterIP` and are not exposed to the LAN by default. On the node, inspect them with:
+Then deploy Kubernetes configuration:
 
 ```bash
-kubectl -n registry get svc docker-registry
-kubectl -n jenkins get svc jenkins
-kubectl -n longhorn-system get pods
+cd ../kubernetes
+cp terraform.tfvars.example terraform.tfvars
+# Set unused LAN addresses for kube_vip and metallb_address_pool.
+terraform init
+terraform apply
 ```
 
-For a temporary local Jenkins tunnel, use `kubectl -n jenkins port-forward svc/jenkins 8080:8080`. The initial admin password is available from the Jenkins secret in that namespace.
+`kubernetes/` expects K3s from `server/`, using `/etc/rancher/k3s/k3s.yaml` by default. Set `kubeconfig_path` in `kubernetes/terraform.tfvars` only if required.
 
-## Re-running and removal
+## Existing deployment migration
 
-The bootstrap uses `helm upgrade --install` and is safe to rerun after a failed rollout. `terraform apply` reruns when the rendered configuration or target host changes. `terraform destroy` only removes Terraform's local state/resource record; it does not uninstall software from the remote node. Remove the platform deliberately with `sudo /usr/local/bin/k3s-uninstall.sh` on the node after backing up data.
+Do not run `terraform destroy` in the former repository root. Its state only tracked the local bootstrap file and command record; it did not manage Kubernetes objects directly. Initialize and apply `server/`, then `kubernetes/`, to establish the new independent states and reconcile installed Helm releases.
+
+Kube-VIP and MetalLB addresses must be unused, on the same L2 network as the node, and excluded from DHCP. This remains a single-node setup; the VIP does not provide high availability.
