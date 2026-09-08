@@ -1,8 +1,0 @@
-FROM alpine:3.20
-
-WORKDIR /workspace
-COPY . /workspace
-
-# This is a test artifact, not an image that contains Terraform credentials.
-LABEL org.opencontainers.image.title="terraform-pr-test"
-CMD ["sh", "-c", "test -f /workspace/main.tf && echo test-image-ready"]
