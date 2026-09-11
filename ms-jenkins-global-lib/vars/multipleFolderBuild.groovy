@@ -9,30 +9,31 @@
  * 3. If it's a merge / push to main/dev -> Runs CD Deployment Pipeline!
  */
 def call(Map params = [:]) {
-    boolean isPullRequest = (env.CHANGE_ID != null || env.CHANGE_TARGET != null)
+    boolean isPullRequest = (env.CHANGE_ID != null || env.CHANGE_TARGET != null || (env.BRANCH_NAME != null && env.BRANCH_NAME.startsWith('PR-')))
     
-    // Check if commit message contains "deploy" (case-insensitive)
-    String commitMsg = ""
-    try {
-        commitMsg = sh(script: 'git log -1 --pretty=%B || true', returnStdout: true).trim().toLowerCase()
-    } catch (Exception e) {
-        commitMsg = ""
-    }
+    // Safely inspect PR Title, Source Branch, and Branch Name for 'deploy' keyword
+    String prTitle = (env.CHANGE_TITLE ?: "").toLowerCase()
+    String changeBranch = (env.CHANGE_BRANCH ?: "").toLowerCase()
+    String branchName = (env.BRANCH_NAME ?: "").toLowerCase()
 
-    boolean hasDeployKeyword = commitMsg.contains('deploy')
+    boolean hasDeployKeyword = prTitle.contains('deploy') || changeBranch.contains('deploy') || branchName.contains('deploy')
 
     echo "=========================================================="
-    echo " Execution Mode Decision:"
-    echo " Is Pull Request:    ${isPullRequest}"
-    echo " Commit Message:     ${commitMsg}"
-    echo " Has 'deploy' word:  ${hasDeployKeyword}"
+    echo " FLIPR PIPELINE MASTER DISPATCHER"
+    echo " Is Pull Request:      ${isPullRequest}"
+    echo " Branch Name:          ${env.BRANCH_NAME}"
+    echo " PR ID:                ${env.CHANGE_ID ?: 'N/A'}"
+    echo " PR Title:             ${env.CHANGE_TITLE ?: 'N/A'}"
+    echo " PR Source Branch:     ${env.CHANGE_BRANCH ?: 'N/A'}"
+    echo " Deploy Keyword Found: ${hasDeployKeyword}"
     echo "=========================================================="
 
     if (isPullRequest && !hasDeployKeyword) {
-        echo "--> Triggering CI / PR Validation Pipeline for PR commit..."
+        echo "--> Triggering CI / PR Validation Pipeline (CI Mode)..."
         ciValidationPipeline(params)
     } else {
-        echo "--> Triggering CD / Deployment Pipeline (Approved Deploy / Merge)..."
+        echo "--> Triggering CD / Deployment Pipeline (CD Mode: Approved Deploy / Main)..."
         cdDeploymentPipeline(params)
     }
 }
+
