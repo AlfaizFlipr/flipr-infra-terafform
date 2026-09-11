@@ -168,7 +168,11 @@ EOF
                     container('helm-kubectl') {
                         script {
                             echo "--> Deploying applications using project Helm chart(s)..."
-                            sh "kubectl create namespace ${releaseNamespace} --dry-run=client -o yaml | kubectl apply -f -"
+                            
+                            // Safe namespace creation if not default
+                            if (releaseNamespace != 'default') {
+                                sh "kubectl get namespace ${releaseNamespace} >/dev/null 2>&1 || kubectl create namespace ${releaseNamespace} --dry-run=client -o yaml | kubectl apply -f - || true"
+                            }
 
                             apps.each { appEntry ->
                                 def appType = appEntry.keySet()[0]
@@ -202,6 +206,7 @@ EOF
 
                                             helm upgrade --install \${releaseName} "\${CHART_PATH}" \
                                                 --namespace ${releaseNamespace} \
+                                                --create-namespace \
                                                 --set image.repository=${imageRepository} \
                                                 --set image.tag=${imageTag} \
                                                 --set app.name=\${releaseName} \
