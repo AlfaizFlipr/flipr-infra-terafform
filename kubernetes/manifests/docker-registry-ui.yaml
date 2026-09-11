@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry-ui
+  namespace: registry
+  labels:
+    app: docker-registry-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-registry-ui
+  template:
+    metadata:
+      labels:
+        app: docker-registry-ui
+    spec:
+      containers:
+      - name: docker-registry-ui
+        image: joxit/docker-registry-ui:static
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: REGISTRY_URL
+          value: "http://docker-registry.registry.svc.cluster.local:5000"
+        - name: REGISTRY_TITLE
+          value: "Flipr Docker Registry"
+        - name: SINGLE_REGISTRY
+          value: "true"
+        - name: DELETE_IMAGES
+          value: "true"
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docker-registry-ui
+  namespace: registry
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: docker-registry-ui
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: docker-registry-ui-ingress
+  namespace: registry
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - registry-ui.flipr.local
+    secretName: flipr-wildcard-tls
+  rules:
+  - host: registry-ui.flipr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: docker-registry-ui
+            port:
+              number: 80
