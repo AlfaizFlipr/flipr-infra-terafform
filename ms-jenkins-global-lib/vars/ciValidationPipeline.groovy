@@ -1,15 +1,9 @@
 #!/usr/bin/env groovy
 
 /**
- * ciValidationPipeline - Dedicated CI / PR Validation Pipeline DSL
- * 
- * Supports:
- * - nodeJs (Express, NestJS, etc.)
- * - reactJs (Vite, CRA, Webpack)
- * - nextJs (Next.js SSR / Static)
- * - Fast Git Diff change detection (validates only changed folders)
- * - Helm Lint & Dry-run verification on project Helm charts
- * - GitHub PR check status reporting
+ * ciValidationPipeline - Fast, Lightweight CI / PR Validation Pipeline
+ *
+ * Uses a single unified Node 24 agent pod to avoid pulling multiple heavy images.
  */
 def call(Map params = [:]) {
     def config = params.get('config', [:])
@@ -21,6 +15,7 @@ def call(Map params = [:]) {
     def branchName = env.BRANCH_NAME ?: 'PR'
     def commitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : (env.BUILD_NUMBER ?: 'latest')
 
+    // Single lightweight container pod (Node 24 with git & helm)
     def podYaml = """
 apiVersion: v1
 kind: Pod
@@ -31,20 +26,8 @@ metadata:
 spec:
   serviceAccountName: default
   containers:
-  - name: nodejs
+  - name: runner
     image: node:24-alpine
-    command: ['cat']
-    tty: true
-    workingDir: /home/jenkins/agent
-    resources:
-      requests:
-        cpu: "300m"
-        memory: "512Mi"
-      limits:
-        cpu: "2000m"
-        memory: "2048Mi"
-  - name: helm-kubectl
-    image: alpine/k8s:1.30.2
     command: ['cat']
     tty: true
     workingDir: /home/jenkins/agent
@@ -53,15 +36,15 @@ spec:
         cpu: "200m"
         memory: "256Mi"
       limits:
-        cpu: "1000m"
-        memory: "1024Mi"
+        cpu: "1500m"
+        memory: "1536Mi"
 """
 
     pipeline {
         agent {
             kubernetes {
                 yaml podYaml
-                defaultContainer 'nodejs'
+                defaultContainer 'runner'
             }
         }
 
@@ -73,7 +56,7 @@ spec:
         }
 
         stages {
-            stage('CI: Change Detection') {
+            stage('CI: Init & Install Tools') {
                 steps {
                     script {
                         echo "=========================================================="
@@ -83,19 +66,29 @@ spec:
                         echo " Commit:       ${commitHash}"
                         echo "=========================================================="
                         
+                        sh """
+                            # Ensure git and curl are present
+                            apk add --no-cache git curl bash || true
+                            
+                            # Install Helm if missing
+                            if ! command -v helm >/dev/null 2>&1; then
+                                echo "Installing Helm CLI..."
+                                curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash || true
+                            fi
+                        """
+
+                        // Detect changed folders
                         env.CHANGED_FOLDERS = ""
                         try {
-                            container('helm-kubectl') {
-                                sh """
-                                    git fetch origin ${env.CHANGE_TARGET ?: 'main'} || true
-                                    CHANGED=\$(git diff --name-only origin/${env.CHANGE_TARGET ?: 'main'}...HEAD | cut -d/ -f1 | sort -u | tr '\\n' ',' || true)
-                                    echo "Changed directories: \${CHANGED}"
-                                    echo "\${CHANGED}" > .changed_dirs
-                                """
-                                env.CHANGED_FOLDERS = readFile('.changed_dirs').trim()
-                            }
+                            sh """
+                                git fetch origin ${env.CHANGE_TARGET ?: 'main'} || true
+                                CHANGED=\$(git diff --name-only origin/${env.CHANGE_TARGET ?: 'main'}...HEAD | cut -d/ -f1 | sort -u | tr '\\n' ',' || true)
+                                echo "Changed directories: \${CHANGED}"
+                                echo "\${CHANGED}" > .changed_dirs
+                            """
+                            env.CHANGED_FOLDERS = readFile('.changed_dirs').trim()
                         } catch (Exception e) {
-                            echo "Could not calculate git diff. Validating all configured apps. Error: ${e.message}"
+                            echo "Could not calculate git diff precisely. Will validate all configured apps. Error: ${e.message}"
                         }
                     }
                 }
@@ -111,7 +104,6 @@ spec:
                             def appSpec = appEntry[appType]
                             def appPath = appSpec.path ?: '.'
                             def appName = appPath.replaceAll('/', '-').replaceAll('\\.', 'root')
-                            def nodeVer = appSpec.node_version ?: '24'
 
                             boolean shouldRun = true
                             if (env.CHANGED_FOLDERS && !env.CHANGED_FOLDERS.isEmpty()) {
@@ -122,40 +114,38 @@ spec:
                             if (shouldRun) {
                                 parallelStages["CI: ${appName} (${appType})"] = {
                                     stage("CI: ${appName}") {
-                                        container('nodejs') {
-                                            dir(appPath) {
-                                                echo "--> Running CI checks for ${appName} (${appType}, Node ${nodeVer})..."
-                                                sh """
-                                                    if [ -f package.json ]; then
-                                                        echo "Installing dependencies for ${appName}..."
-                                                        npm ci --prefer-offline --no-audit || npm install
-                                                        
-                                                        # Lint Check
-                                                        if npm run | grep -q "lint"; then
-                                                            echo "Running Linter for ${appName}..."
-                                                            npm run lint
-                                                        else
-                                                            echo "No 'lint' script found for ${appName}."
-                                                        fi
-
-                                                        # Test Check
-                                                        if npm run | grep -q "test"; then
-                                                            echo "Running Unit Tests for ${appName}..."
-                                                            CI=true npm test -- --passWithNoTests || npm test || true
-                                                        else
-                                                            echo "No 'test' script found for ${appName}."
-                                                        fi
-
-                                                        # Build Compilation Check (React / Next.js / TypeScript)
-                                                        if npm run | grep -q "build"; then
-                                                            echo "Validating Build Compilation for ${appName} (${appType})..."
-                                                            npm run build
-                                                        fi
+                                        dir(appPath) {
+                                            echo "--> Running CI checks for ${appName} (${appType}) in path: ${appPath}..."
+                                            sh """
+                                                if [ -f package.json ]; then
+                                                    echo "Installing dependencies for ${appName}..."
+                                                    npm ci --prefer-offline --no-audit || npm install
+                                                    
+                                                    # Lint Check
+                                                    if npm run | grep -q "lint"; then
+                                                        echo "Running Linter for ${appName}..."
+                                                        npm run lint
                                                     else
-                                                        echo "No package.json found in ${appPath}."
+                                                        echo "No 'lint' script found for ${appName}."
                                                     fi
-                                                """
-                                            }
+
+                                                    # Test Check
+                                                    if npm run | grep -q "test"; then
+                                                        echo "Running Unit Tests for ${appName}..."
+                                                        CI=true npm test -- --passWithNoTests || npm test || true
+                                                    else
+                                                        echo "No 'test' script found for ${appName}."
+                                                    fi
+
+                                                    # Build Compilation Check
+                                                    if npm run | grep -q "build"; then
+                                                        echo "Validating Build Compilation for ${appName} (${appType})..."
+                                                        npm run build
+                                                    fi
+                                                else
+                                                    echo "No package.json found in ${appPath}."
+                                                fi
+                                            """
                                         }
                                     }
                                 }
@@ -175,26 +165,24 @@ spec:
 
             stage('CI: Project Helm Chart Lint') {
                 steps {
-                    container('helm-kubectl') {
-                        script {
-                            echo "--> Scanning repository for project Helm charts and validating syntax..."
-                            sh """
-                                CHART_FILES=\$(find . -type f -name "Chart.yaml" -not -path "*/node_modules/*" || true)
-                                if [ -n "\${CHART_FILES}" ]; then
-                                    for CHART_FILE in \${CHART_FILES}; do
-                                        CHART_DIR=\$(dirname "\${CHART_FILE}")
-                                        echo "=========================================================="
-                                        echo " Linting Project Helm Chart: \${CHART_DIR}"
-                                        echo "=========================================================="
-                                        helm lint "\${CHART_DIR}"
-                                        helm template pr-test "\${CHART_DIR}" --dry-run > /dev/null
-                                        echo "Helm dry-run validation PASSED for \${CHART_DIR}!"
-                                    done
-                                else
-                                    echo "No Helm charts found in project repository. Skipping chart lint."
-                                fi
-                            """
-                        }
+                    script {
+                        echo "--> Scanning repository for project Helm charts and validating syntax..."
+                        sh """
+                            CHART_FILES=\$(find . -type f -name "Chart.yaml" -not -path "*/node_modules/*" || true)
+                            if [ -n "\${CHART_FILES}" ]; then
+                                for CHART_FILE in \${CHART_FILES}; do
+                                    CHART_DIR=\$(dirname "\${CHART_FILE}")
+                                    echo "=========================================================="
+                                    echo " Linting Project Helm Chart: \${CHART_DIR}"
+                                    echo "=========================================================="
+                                    helm lint "\${CHART_DIR}"
+                                    helm template pr-test "\${CHART_DIR}" --dry-run > /dev/null
+                                    echo "Helm dry-run validation PASSED for \${CHART_DIR}!"
+                                done
+                            else
+                                echo "No Helm charts found in project repository. Skipping chart lint."
+                            fi
+                        """
                     }
                 }
             }
