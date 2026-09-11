@@ -199,24 +199,24 @@ EOF
 
                                         if [ -n "\${CHART_PATH}" ] && [ -f "\${CHART_PATH}/Chart.yaml" ]; then
                                             echo "=========================================================="
-                                            echo " Deploying Release: \${releaseName}"
+                                            echo " Deploying Release: ${releaseName}"
                                             echo " Using Project Chart: \${CHART_PATH}"
                                             echo " Image: ${imageRepository}:${imageTag}"
                                             echo "=========================================================="
 
-                                            helm upgrade --install \${releaseName} "\${CHART_PATH}" \
+                                            helm upgrade --install ${releaseName} "\${CHART_PATH}" \
                                                 --namespace ${releaseNamespace} \
                                                 --create-namespace \
                                                 --set image.repository=${imageRepository} \
                                                 --set image.tag=${imageTag} \
-                                                --set app.name=\${releaseName} \
+                                                --set app.name=${releaseName} \
                                                 --set app.subdomain=${subAppName} \
                                                 --set ingress.hosts[0].host="${subAppName}.${repoName}.flipr.local" \
                                                 --wait --timeout 5m
 
-                                            echo "Helm release \${releaseName} applied successfully!"
+                                            echo "Helm release ${releaseName} applied successfully!"
                                         else
-                                            echo "WARNING: No Helm chart found in ${appPath}/helm or ./helm for \${releaseName}."
+                                            echo "WARNING: No Helm chart found in ${appPath}/helm or ./helm for ${releaseName}."
                                         fi
                                     """
                                 }
