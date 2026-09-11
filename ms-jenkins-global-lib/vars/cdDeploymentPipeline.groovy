@@ -248,7 +248,7 @@ EOF
 
         post {
             always {
-                cleanWs deleteDirs: true, notFailBuild: true
+                deleteDir()
             }
             success {
                 echo "=========================================================="
