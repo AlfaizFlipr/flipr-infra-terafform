@@ -3,36 +3,36 @@
 /**
  * multipleFolderBuild - Master Dispatcher Pipeline DSL for Flipr Organization
  *
- * Checks PR title, branch name, and commit message for "deploy" keyword:
- * 1. If PR title or branch contains "deploy" -> CD Deployment Pipeline
- * 2. If it's a standard PR -> CI / PR Validation Pipeline
- * 3. If it's a push/merge to main/dev -> CD Deployment Pipeline
+ * Rules:
+ * 1. If it's a Pull Request AND the commit message contains "deploy" -> Runs CD Deployment!
+ * 2. If it's a Pull Request (normal commit) -> Runs CI / PR Validation Pipeline!
+ * 3. If it's a merge / push to main/dev -> Runs CD Deployment Pipeline!
  */
 def call(Map params = [:]) {
     boolean isPullRequest = (env.CHANGE_ID != null || env.CHANGE_TARGET != null)
     
-    // Check environment variables for deploy trigger (PR title, branch name)
-    String changeTitle = (env.CHANGE_TITLE ?: '').toLowerCase()
-    String branchName = (env.BRANCH_NAME ?: '').toLowerCase()
-    String changeBranch = (env.CHANGE_BRANCH ?: '').toLowerCase()
+    // Check if commit message contains "deploy" (case-insensitive)
+    String commitMsg = ""
+    try {
+        commitMsg = sh(script: 'git log -1 --pretty=%B || true', returnStdout: true).trim().toLowerCase()
+    } catch (Exception e) {
+        commitMsg = ""
+    }
 
-    boolean isDeployTrigger = changeTitle.contains('deploy') || 
-                              branchName.contains('deploy') || 
-                              changeBranch.contains('deploy')
+    boolean hasDeployKeyword = commitMsg.contains('deploy')
 
     echo "=========================================================="
     echo " Execution Mode Decision:"
-    echo " Is Pull Request:      ${isPullRequest}"
-    echo " PR Title:             ${env.CHANGE_TITLE ?: 'N/A'}"
-    echo " Branch Name:          ${env.BRANCH_NAME ?: 'N/A'}"
-    echo " Deploy Keyword Found: ${isDeployTrigger}"
+    echo " Is Pull Request:    ${isPullRequest}"
+    echo " Commit Message:     ${commitMsg}"
+    echo " Has 'deploy' word:  ${hasDeployKeyword}"
     echo "=========================================================="
 
-    if (isPullRequest && !isDeployTrigger) {
-        echo "--> Triggering CI / PR Validation Pipeline for PR..."
+    if (isPullRequest && !hasDeployKeyword) {
+        echo "--> Triggering CI / PR Validation Pipeline for PR commit..."
         ciValidationPipeline(params)
     } else {
-        echo "--> Triggering CD / Deployment Pipeline..."
+        echo "--> Triggering CD / Deployment Pipeline (Approved Deploy / Merge)..."
         cdDeploymentPipeline(params)
     }
 }
