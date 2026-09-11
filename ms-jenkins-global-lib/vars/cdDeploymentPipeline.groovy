@@ -248,7 +248,7 @@ EOF
 
         post {
             always {
-                deleteDir()
+                sh 'rm -rf * .[^.]* 2>/dev/null || true'
             }
             success {
                 echo "=========================================================="

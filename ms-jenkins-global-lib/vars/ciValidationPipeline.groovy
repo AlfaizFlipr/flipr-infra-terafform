@@ -2,8 +2,6 @@
 
 /**
  * ciValidationPipeline - Fast, Lightweight CI / PR Validation Pipeline
- *
- * Uses a single unified Node 24 agent pod to avoid pulling multiple heavy images.
  */
 def call(Map params = [:]) {
     def config = params.get('config', [:])
@@ -15,7 +13,6 @@ def call(Map params = [:]) {
     def branchName = env.BRANCH_NAME ?: 'PR'
     def commitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : (env.BUILD_NUMBER ?: 'latest')
 
-    // Single lightweight container pod (Node 24 with git & helm)
     def podYaml = """
 apiVersion: v1
 kind: Pod
@@ -67,28 +64,35 @@ spec:
                         echo "=========================================================="
                         
                         sh """
-                            # Ensure git and curl are present
-                            apk add --no-cache git curl bash || true
+                            # Install git, curl, openssl, tar
+                            apk add --no-cache git curl bash openssl tar || true
                             
-                            # Install Helm if missing
+                            # Install Helm binary directly if not present
                             if ! command -v helm >/dev/null 2>&1; then
-                                echo "Installing Helm CLI..."
-                                curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash || true
+                                echo "Downloading Helm CLI binary..."
+                                curl -fsSL https://get.helm.sh/helm-v3.15.4-linux-amd64.tar.gz | tar -xz -C /tmp
+                                mv /tmp/linux-amd64/helm /usr/local/bin/helm
+                                chmod +x /usr/local/bin/helm
+                                rm -rf /tmp/linux-amd64
                             fi
+                            helm version
                         """
+
+                        // Safe git directory configuration
+                        sh "git config --global --add safe.directory '*' || true"
 
                         // Detect changed folders
                         env.CHANGED_FOLDERS = ""
                         try {
                             sh """
                                 git fetch origin ${env.CHANGE_TARGET ?: 'main'} || true
-                                CHANGED=\$(git diff --name-only origin/${env.CHANGE_TARGET ?: 'main'}...HEAD | cut -d/ -f1 | sort -u | tr '\\n' ',' || true)
+                                CHANGED=\$(git diff --name-only origin/${env.CHANGE_TARGET ?: 'main'}...HEAD 2>/dev/null | cut -d/ -f1 | sort -u | tr '\\n' ',' || true)
                                 echo "Changed directories: \${CHANGED}"
                                 echo "\${CHANGED}" > .changed_dirs
                             """
                             env.CHANGED_FOLDERS = readFile('.changed_dirs').trim()
                         } catch (Exception e) {
-                            echo "Could not calculate git diff precisely. Will validate all configured apps. Error: ${e.message}"
+                            echo "Could not calculate git diff precisely. Validating all configured apps. Error: ${e.message}"
                         }
                     }
                 }
@@ -119,7 +123,7 @@ spec:
                                             sh """
                                                 if [ -f package.json ]; then
                                                     echo "Installing dependencies for ${appName}..."
-                                                    npm ci --prefer-offline --no-audit || npm install
+                                                    npm install --prefer-offline --no-audit || npm ci || true
                                                     
                                                     # Lint Check
                                                     if npm run | grep -q "lint"; then
@@ -190,7 +194,7 @@ spec:
 
         post {
             always {
-                deleteDir()
+                sh 'rm -rf * .[^.]* 2>/dev/null || true'
             }
             success {
                 echo "=========================================================="
