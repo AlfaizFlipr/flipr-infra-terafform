@@ -59,11 +59,11 @@ Or run the commands manually:
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
 
-# 2. Install Argo CD
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# 2. Install Argo CD (Server-side apply avoids CRD annotation size limit)
+kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# 3. Install Argo Rollouts Controller & CRDs
-kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+# 3. Install Argo Rollouts Controller & CRDs (Server-side apply)
+kubectl apply --server-side --force-conflicts -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
 
 # 4. Install Argo Rollouts Dashboard UI
 kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/dashboard-install.yaml
