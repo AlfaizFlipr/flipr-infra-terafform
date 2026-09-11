@@ -212,6 +212,8 @@ EOF
                                                 --set app.name=${releaseName} \
                                                 --set app.subdomain=${subAppName} \
                                                 --set ingress.hosts[0].host="${subAppName}.${repoName}.flipr.local" \
+                                                --set ingress.hosts[0].paths[0].path="/" \
+                                                --set ingress.hosts[0].paths[0].pathType="Prefix" \
                                                 --wait --timeout 5m
 
                                             echo "Helm release ${releaseName} applied successfully!"
