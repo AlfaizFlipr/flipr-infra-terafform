@@ -6,7 +6,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   tls:
@@ -18,6 +18,16 @@ spec:
     http:
       paths:
       - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jenkins
+            port:
+              number: 8080
+  - host: 127.0.0.1
+    http:
+      paths:
+      - path: /github-webhook
         pathType: Prefix
         backend:
           service:
