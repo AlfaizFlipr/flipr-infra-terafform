@@ -6,9 +6,14 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "false"
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - argocd.flipr.local
+    secretName: flipr-wildcard-tls
   rules:
   - host: argocd.flipr.local
     http:

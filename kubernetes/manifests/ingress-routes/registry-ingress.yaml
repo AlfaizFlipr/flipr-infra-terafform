@@ -6,10 +6,14 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - registry.flipr.local
+    secretName: flipr-wildcard-tls
   rules:
   - host: registry.flipr.local
     http:
