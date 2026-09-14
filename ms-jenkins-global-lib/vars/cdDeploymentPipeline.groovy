@@ -23,8 +23,29 @@ def call(Map params = [:]) {
     if (env.JOB_BASE_NAME && env.JOB_NAME.split('/').length >= 2) {
         repoName = env.JOB_NAME.split('/')[env.JOB_NAME.split('/').length - 2].toLowerCase()
     }
-    def branchName = env.BRANCH_NAME ?: 'main'
+    def branchName = env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'main'
     def commitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : (env.BUILD_NUMBER ?: 'latest')
+
+    def isDev = (branchName == 'dev')
+    def sprintMatcher = (branchName =~ /^sprint-(\d+)-.*$/)
+    def isSprint = sprintMatcher.matches()
+
+    if (!isDev && !isSprint) {
+        echo "Branch '${branchName}' is not 'dev' or 'sprint-<numeric>-<Any>'. Skipping CD pipeline."
+        pipeline {
+            agent any
+            stages {
+                stage('Skipped') {
+                    steps {
+                        echo "Skipped deployment for branch: ${branchName}"
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    def branchDomainPart = isDev ? 'dev' : sprintMatcher[0][1]
 
     def podYaml = """
 apiVersion: v1
@@ -212,7 +233,7 @@ EOF
                                                 --set image.tag=${imageTag} \
                                                 --set app.name=${releaseName} \
                                                 --set app.subdomain=${subAppName} \
-                                                --set ingress.hosts[0].host="${subAppName}.${repoName}.init.flipr.ai" \
+                                                --set ingress.hosts[0].host="${subAppName}.${branchDomainPart}.${repoName}.init.flipr.ai" \
                                                 --set ingress.hosts[0].paths[0].path="/" \
                                                 --set ingress.hosts[0].paths[0].pathType="Prefix" \
                                                 --wait --timeout 5m

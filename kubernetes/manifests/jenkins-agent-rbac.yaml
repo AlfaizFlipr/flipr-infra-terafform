@@ -5,10 +5,10 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: jenkins
+  namespace: devops
 - kind: ServiceAccount
   name: jenkins
-  namespace: jenkins
+  namespace: devops
 roleRef:
   kind: ClusterRole
   name: cluster-admin

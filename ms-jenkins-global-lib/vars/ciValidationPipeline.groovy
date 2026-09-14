@@ -10,8 +10,27 @@ def call(Map params = [:]) {
     if (env.JOB_BASE_NAME && env.JOB_NAME.split('/').length >= 2) {
         repoName = env.JOB_NAME.split('/')[env.JOB_NAME.split('/').length - 2].toLowerCase()
     }
-    def branchName = env.BRANCH_NAME ?: 'PR'
+    def branchName = env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'PR'
     def commitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : (env.BUILD_NUMBER ?: 'latest')
+
+    def isDev = (branchName == 'dev')
+    def sprintMatcher = (branchName =~ /^sprint-(\d+)-.*$/)
+    def isSprint = sprintMatcher.matches()
+
+    if (!isDev && !isSprint) {
+        echo "Branch '${branchName}' is not 'dev' or 'sprint-<numeric>-<Any>'. Skipping CI pipeline."
+        pipeline {
+            agent any
+            stages {
+                stage('Skipped') {
+                    steps {
+                        echo "Skipped validation for branch: ${branchName}"
+                    }
+                }
+            }
+        }
+        return
+    }
 
     def podYaml = """
 apiVersion: v1
