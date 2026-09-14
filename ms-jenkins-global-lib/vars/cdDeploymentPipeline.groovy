@@ -27,8 +27,7 @@ def call(Map params = [:]) {
     def commitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : (env.BUILD_NUMBER ?: 'latest')
 
     def isDev = (branchName == 'dev')
-    def sprintMatcher = (branchName =~ /^sprint-(\d+)-.*$/)
-    def isSprint = sprintMatcher.matches()
+    def isSprint = branchName.matches(/^sprint-\d+-.*$/)
 
     if (!isDev && !isSprint) {
         echo "Branch '${branchName}' is not 'dev' or 'sprint-<numeric>-<Any>'. Skipping CD pipeline."
@@ -45,7 +44,7 @@ def call(Map params = [:]) {
         return
     }
 
-    def branchDomainPart = isDev ? 'dev' : sprintMatcher[0][1]
+    def branchDomainPart = isDev ? 'dev' : branchName.replaceAll(/^sprint-(\d+)-.*$/, '$1')
 
     def podYaml = """
 apiVersion: v1
