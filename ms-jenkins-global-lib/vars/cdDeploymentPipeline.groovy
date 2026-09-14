@@ -239,10 +239,10 @@ EOF
 
                                             echo "Helm release ${releaseName} applied successfully!"
 
-                                            # Ensure wildcard TLS is attached even if the project's Helm chart is missing the TLS block
+                                            # Ensure cert-manager annotations and TLS block are attached
                                             kubectl patch ingress ${releaseName}-ingress -n ${releaseNamespace} \
                                                 --type='merge' \
-                                                -p='{"spec":{"tls":[{"hosts":["'${subAppName}.${branchDomainPart}.${repoName}.init.flipr.ai'"],"secretName":"flipr-wildcard-tls"}]}}' || true
+                                                -p='{"metadata":{"annotations":{"cert-manager.io/cluster-issuer":"letsencrypt-prod"}},"spec":{"tls":[{"hosts":["'${subAppName}.${branchDomainPart}.${repoName}.init.flipr.ai'"],"secretName":"'${releaseName}-tls'"}]}}' || true
                                         else
                                             echo "WARNING: No Helm chart found in ${appPath}/helm or ./helm for ${releaseName}."
                                         fi

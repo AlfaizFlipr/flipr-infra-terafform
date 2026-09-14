@@ -8,12 +8,13 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
     - registry.init.flipr.ai
-    secretName: flipr-wildcard-tls
+    secretName: registry-tls
   rules:
   - host: registry.init.flipr.ai
     http:

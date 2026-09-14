@@ -304,13 +304,14 @@ metadata:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   tls:
   {{- range .Values.ingress.hosts }}
   - hosts:
     - {{ .host }}
-    secretName: flipr-wildcard-tls
+    secretName: {{ $.Release.Name }}-tls
   {{- end }}
   rules:
   {{- range .Values.ingress.hosts }}
