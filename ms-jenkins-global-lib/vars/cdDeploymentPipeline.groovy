@@ -254,6 +254,14 @@ EOF
                     container('helm-kubectl') {
                         script {
                             echo "--> Checking Argo Rollouts deployment progression..."
+                            sh '''
+                            # Install Argo Rollouts kubectl plugin if not present
+                            if ! kubectl argo rollouts version >/dev/null 2>&1; then
+                                curl -sLO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+                                chmod +x kubectl-argo-rollouts-linux-amd64
+                                mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+                            fi
+                            '''
                             apps.each { appEntry ->
                                 def appType = appEntry.keySet()[0]
                                 def appSpec = appEntry[appType]
