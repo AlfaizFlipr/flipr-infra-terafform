@@ -201,7 +201,7 @@ EOF
                                 def appPath = appSpec.path ?: '.'
                                 def subAppName = appPath.replaceAll('/', '-').replaceAll('\\.', 'root')
                                 def releaseName = "${repoName}-${subAppName}"
-                                def imageRepository = "${clusterRegistry}/${releaseName}"
+                                def imageRepository = "registry.init.flipr.ai/${releaseName}"
                                 def imageTag = commitHash
 
                                 stage("Deploy: ${releaseName}") {
