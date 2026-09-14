@@ -122,6 +122,13 @@ spec:
 
                             stage("Build: ${subAppName}") {
                                 container('kaniko') {
+                                    def apiPathConfig = params.config?.apiPath
+                                    def apiUrlArg = ""
+                                    if (apiPathConfig && (appType == "reactJs" || appType == "nextJs" || appType == "viteJs")) {
+                                        def apiUrl = "https://${apiPathConfig}.${branchDomainPart}.${repoName}.init.flipr.ai"
+                                        apiUrlArg = "--build-arg REACT_APP_API_URL=${apiUrl} --build-arg NEXT_PUBLIC_API_URL=${apiUrl} --build-arg VITE_API_URL=${apiUrl} --build-arg API_BASE_URL=${apiUrl} --build-arg REACT_APP_BASE_URL=${apiUrl}"
+                                    }
+
                                     echo "--> Kaniko Building Docker image for ${subAppName} (${appType})..."
                                     dir(appPath) {
                                         sh """
@@ -135,17 +142,23 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --prefer-offline --no-audit || npm install
 COPY . .
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=\$NEXT_PUBLIC_API_URL
 RUN npm run build
 EXPOSE 3000
 CMD ["npm", "start"]
 EOF
-                                                elif [ "${appType}" = "reactJs" ]; then
+                                                elif [ "${appType}" = "reactJs" ] || [ "${appType}" = "viteJs" ]; then
                                                     cat << 'EOF' > Dockerfile
 FROM node:24-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --prefer-offline --no-audit || npm install
 COPY . .
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=\$REACT_APP_API_URL
+ARG VITE_API_URL
+ENV VITE_API_URL=\$VITE_API_URL
 RUN if npm run | grep -q "build"; then npm run build; fi
 EXPOSE 3000 80
 CMD ["npm", "start"]
@@ -172,7 +185,8 @@ EOF
                                                 --insecure \
                                                 --skip-tls-verify \
                                                 --cache=true \
-                                                --cache-dir=/tmp/kaniko-cache
+                                                --cache-dir=/tmp/kaniko-cache \
+                                                ${apiUrlArg}
                                             
                                             echo "Successfully pushed ${commitTag} to local registry!"
                                         """
