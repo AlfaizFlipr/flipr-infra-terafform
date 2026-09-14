@@ -15,6 +15,18 @@ def call(Map params = [:]) {
     String prComment = (env.ghprbCommentBody ?: env.GITHUB_PR_COMMENT ?: "").toUpperCase()
     boolean hasDeployKeyword = prComment.contains('DEPLOY')
 
+    // If variables aren't set, check Jenkins Build Causes (used by GitHub Branch Source plugin)
+    if (!hasDeployKeyword) {
+        def causes = currentBuild.getBuildCauses()
+        for (int i = 0; i < causes.size(); i++) {
+            String desc = (causes[i].shortDescription ?: "").toUpperCase()
+            if (desc.contains("COMMENT") && desc.contains("DEPLOY")) {
+                hasDeployKeyword = true
+                break
+            }
+        }
+    }
+
     echo "=========================================================="
     echo " FLIPR PIPELINE MASTER DISPATCHER"
     echo " Is Pull Request:      ${isPullRequest}"
