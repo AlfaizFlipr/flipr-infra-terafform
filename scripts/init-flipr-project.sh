@@ -306,6 +306,12 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+  tls:
+  {{- range .Values.ingress.hosts }}
+  - hosts:
+    - {{ .host }}
+    secretName: flipr-wildcard-tls
+  {{- end }}
   rules:
   {{- range .Values.ingress.hosts }}
   - host: {{ .host }}

@@ -238,6 +238,11 @@ EOF
                                                 --wait --timeout 5m
 
                                             echo "Helm release ${releaseName} applied successfully!"
+
+                                            # Ensure wildcard TLS is attached even if the project's Helm chart is missing the TLS block
+                                            kubectl patch ingress ${releaseName}-ingress -n ${releaseNamespace} \
+                                                --type='merge' \
+                                                -p='{"spec":{"tls":[{"hosts":["'${subAppName}.${branchDomainPart}.${repoName}.init.flipr.ai'"],"secretName":"flipr-wildcard-tls"}]}}' || true
                                         else
                                             echo "WARNING: No Helm chart found in ${appPath}/helm or ./helm for ${releaseName}."
                                         fi
