@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: docker-registry-ui
-  namespace: registry
+  namespace: fliprdev
   labels:
     app: docker-registry-ui
 spec:
@@ -21,7 +21,7 @@ spec:
         imagePullPolicy: IfNotPresent
         env:
         - name: NGINX_PROXY_PASS_URL
-          value: "http://docker-registry.registry.svc.cluster.local:5000"
+          value: "http://docker-registry.fliprdev.svc.cluster.local:5000"
         - name: REGISTRY_TITLE
           value: "Flipr Docker Registry"
         - name: SINGLE_REGISTRY
@@ -45,7 +45,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: docker-registry-ui
-  namespace: registry
+  namespace: fliprdev
 spec:
   type: ClusterIP
   ports:
@@ -60,17 +60,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: docker-registry-ui-ingress
-  namespace: registry
+  namespace: fliprdev
   annotations:
     kubernetes.io/ingress.class: nginx
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - registry-ui.flipr.local
+    - registry-ui.init.flipr.ai
     secretName: flipr-wildcard-tls
   rules:
-  - host: registry-ui.flipr.local
+  - host: registry-ui.init.flipr.ai
     http:
       paths:
       - path: /

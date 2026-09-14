@@ -151,7 +151,7 @@ CHART
 replicaCount: 3
 
 image:
-  repository: docker-registry.registry.svc.cluster.local:5000/${PROJECT_NAME}-${APP_CLEAN}
+  repository: docker-registry.fliprdev.svc.cluster.local:5000/${PROJECT_NAME}-${APP_CLEAN}
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -164,7 +164,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: ${APP_CLEAN}.${PROJECT_NAME}.flipr.local
+    - host: ${APP_CLEAN}.${PROJECT_NAME}.init.flipr.ai
       paths:
         - path: /
           pathType: Prefix

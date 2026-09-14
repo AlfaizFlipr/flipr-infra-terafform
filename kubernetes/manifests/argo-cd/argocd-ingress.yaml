@@ -12,10 +12,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - argocd.flipr.local
+    - argocd.init.flipr.ai
     secretName: flipr-wildcard-tls
   rules:
-  - host: argocd.flipr.local
+  - host: argocd.init.flipr.ai
     http:
       paths:
       - path: /

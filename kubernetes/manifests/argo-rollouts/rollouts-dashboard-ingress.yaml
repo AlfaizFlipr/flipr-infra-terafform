@@ -11,10 +11,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - rollouts.flipr.local
+    - rollouts.init.flipr.ai
     secretName: flipr-wildcard-tls
   rules:
-  - host: rollouts.flipr.local
+  - host: rollouts.init.flipr.ai
     http:
       paths:
       - path: /

@@ -9,13 +9,14 @@
  * - nextJs (Next.js SSR / Standalone)
  * - Daemonless container image builds with Kaniko
  * - Pushes to internal Docker Registry (docker-registry.registry.svc.cluster.local:5000)
+ * docker-registry.fliprdev.svc.cluster.local:5000 for dev flipr
  * - Deploys via project's own Helm charts (e.g. frontend/helm/..., api/helm/..., or helm/)
  * - Tracks Argo Rollouts Canary release progression & live traffic splitting
  */
 def call(Map params = [:]) {
     def config = params.get('config', [:])
     def apps = params.get('apps', [])
-    def clusterRegistry = params.get('registry', 'docker-registry.registry.svc.cluster.local:5000')
+    def clusterRegistry = params.get('registry', 'docker-registry.fliprdev.svc.cluster.local:5000')
     def releaseNamespace = params.get('namespace', 'default')
 
     def repoName = env.JOB_NAME.split('/')[0].replaceAll('%2F', '-').replaceAll('/', '-').toLowerCase()
@@ -211,7 +212,7 @@ EOF
                                                 --set image.tag=${imageTag} \
                                                 --set app.name=${releaseName} \
                                                 --set app.subdomain=${subAppName} \
-                                                --set ingress.hosts[0].host="${subAppName}.${repoName}.flipr.local" \
+                                                --set ingress.hosts[0].host="${subAppName}.${repoName}.init.flipr.ai" \
                                                 --set ingress.hosts[0].paths[0].path="/" \
                                                 --set ingress.hosts[0].paths[0].pathType="Prefix" \
                                                 --wait --timeout 5m
@@ -261,7 +262,7 @@ EOF
                 echo "=========================================================="
                 echo " CD DEPLOYMENT COMPLETED SUCCESSFULLY!"
                 echo " Repository: ${repoName} (${branchName})"
-                echo " View Canary Status: https://rollouts.flipr.local"
+                echo " View Canary Status: https://rollouts.init.flipr.ai"
                 echo "=========================================================="
             }
             failure {

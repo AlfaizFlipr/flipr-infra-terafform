@@ -8,29 +8,29 @@ echo "=========================================================="
 KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 export KUBECONFIG
 
-# 1. Clean up duplicate flipr.local entries from /etc/hosts
+# 1. Clean up duplicate init.flipr.ai entries from /etc/hosts
 echo "--> Cleaning up /etc/hosts..."
 sudo sed -i '/flipr\.local/d' /etc/hosts || true
 
 # 2. Create Namespaces
-for ns in ingress-nginx argocd argo-rollouts jenkins registry default; do
+for ns in ingress-nginx argocd argo-rollouts devops fliprdev default; do
     kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
 done
 
-# 3. Generate Wildcard TLS Certificate for *.flipr.local
-echo "--> Generating wildcard TLS certificate for *.flipr.local..."
+# 3. Generate Wildcard TLS Certificate for *.init.flipr.ai
+echo "--> Generating wildcard TLS certificate for *.init.flipr.ai..."
 TMP_TLS_DIR="/tmp/flipr-tls"
 mkdir -p "${TMP_TLS_DIR}"
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout "${TMP_TLS_DIR}/tls.key" -out "${TMP_TLS_DIR}/tls.crt" \
-  -subj "/CN=*.flipr.local/O=Flipr" \
-  -addext "subjectAltName=DNS:*.flipr.local,DNS:flipr.local,DNS:jenkins.flipr.local,DNS:argocd.flipr.local,DNS:rollouts.flipr.local,DNS:registry.flipr.local" 2>/dev/null || \
+  -subj "/CN=*.init.flipr.ai/O=Flipr" \
+  -addext "subjectAltName=DNS:*.init.flipr.ai,DNS:init.flipr.ai,DNS:jenkins.init.flipr.ai,DNS:argocd.init.flipr.ai,DNS:rollouts.init.flipr.ai,DNS:registry.init.flipr.ai" 2>/dev/null || \
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout "${TMP_TLS_DIR}/tls.key" -out "${TMP_TLS_DIR}/tls.crt" \
-  -subj "/CN=*.flipr.local/O=Flipr"
+  -subj "/CN=*.init.flipr.ai/O=Flipr"
 
 # 4. Create TLS Secret in all relevant namespaces
-for ns in ingress-nginx argocd argo-rollouts jenkins registry default; do
+for ns in ingress-nginx argocd argo-rollouts devops fliprdev default; do
     kubectl create secret tls flipr-wildcard-tls \
       --key "${TMP_TLS_DIR}/tls.key" \
       --cert "${TMP_TLS_DIR}/tls.crt" \
@@ -89,7 +89,7 @@ kubectl rollout status deployment/argo-rollouts-dashboard -n argo-rollouts --tim
 # 9. Update /etc/hosts on local Ubuntu system
 echo "--> Updating /etc/hosts for local access..."
 sudo bash -c 'cat << EOF >> /etc/hosts
-127.0.0.1 jenkins.flipr.local argocd.flipr.local rollouts.flipr.local registry.flipr.local
+127.0.0.1 jenkins.init.flipr.ai argocd.init.flipr.ai rollouts.init.flipr.ai registry.init.flipr.ai
 EOF'
 
 # 10. Get MetalLB IP
@@ -100,10 +100,10 @@ echo " Setup Completed Successfully!"
 echo "=========================================================="
 echo "Locally on this Ubuntu machine: /etc/hosts is updated with 127.0.0.1"
 echo "On other LAN devices (e.g. Windows laptop), add to /etc/hosts:"
-echo "${INGRESS_IP} jenkins.flipr.local argocd.flipr.local rollouts.flipr.local registry.flipr.local"
+echo "${INGRESS_IP} jenkins.init.flipr.ai argocd.init.flipr.ai rollouts.init.flipr.ai registry.init.flipr.ai"
 echo ""
 echo "Test on Ubuntu terminal:"
-echo "curl -k https://rollouts.flipr.local"
+echo "curl -k https://rollouts.init.flipr.ai"
 echo ""
 echo "Argo CD Admin Username: admin"
 echo -n "Argo CD Admin Password: "
@@ -111,7 +111,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 echo ""
 echo ""
 echo "Access Points:"
-echo " - Argo Rollouts UI:     https://rollouts.flipr.local  or  http://rollouts.flipr.local"
-echo " - Argo CD UI:           https://argocd.flipr.local    or  http://argocd.flipr.local"
-echo " - Jenkins UI:           https://jenkins.flipr.local   or  http://jenkins.flipr.local"
+echo " - Argo Rollouts UI:     https://rollouts.init.flipr.ai  or  http://rollouts.init.flipr.ai"
+echo " - Argo CD UI:           https://argocd.init.flipr.ai    or  http://argocd.init.flipr.ai"
+echo " - Jenkins UI:           https://jenkins.init.flipr.ai   or  http://jenkins.init.flipr.ai"
 echo "=========================================================="
